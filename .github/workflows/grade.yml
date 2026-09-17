@@ -1,0 +1,84 @@
+name: IS117 Practical Check
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify required textbook files
+        shell: bash
+        run: |
+          set -e
+
+          required=(
+            "book/01-persuasion.md"
+            "book/02-archetypes.md"
+            "book/03-design-language.md"
+            "book/04-white-tshirt-case-study.md"
+            "book/05-synthesis.md"
+            "book/README.md"
+          )
+
+          score=0
+          total=6
+
+          echo "## IS 117 Practical Dashboard" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          for file in "${required[@]}"; do
+            if [[ -s "$file" ]]; then
+              echo "✅ $file" >> "$GITHUB_STEP_SUMMARY"
+              score=$((score+1))
+            else
+              echo "❌ $file" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Required files present: $score / $total**" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$score" -ne "$total" ]]; then
+            echo "One or more required files are missing or empty."
+            exit 1
+          fi
+
+      - name: Check for issue references in commit history
+        shell: bash
+        run: |
+          refs=$(git log --pretty=format:%s | grep -E '#[0-9]+' | wc -l || true)
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Traceability" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$refs" -ge 5 ]]; then
+            echo "✅ At least five commit messages reference GitHub issue numbers." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "⚠️ Found $refs commit message(s) containing an issue reference. Target: 5." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Check for Mermaid usage
+        shell: bash
+        run: |
+          count=$(grep -R '```mermaid' book/*.md 2>/dev/null | wc -l || true)
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Visual Structure" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$count" -ge 4 ]]; then
+            echo "✅ Mermaid diagrams found: $count" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "⚠️ Mermaid diagrams found: $count. Target: at least 4." >> "$GITHUB_STEP_SUMMARY"
+          fi
